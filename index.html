@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="id" class="scroll-smooth">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WISATA NUSANTARA - Destinasi Unggulan NTB</title>
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <!-- Leaflet CSS for Map -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#f0fdfa',
+              100: '#ccfbf1',
+              500: '#14b8a6',
+              600: '#0d9488',
+              700: '#0f766e',
+              800: '#115e59',
+              900: '#134e4a',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    .glass-panel {
+      background: rgba(255, 255, 255, 0.85);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+    }
+    .custom-scrollbar::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 9999px;
+    }
+    #leafletMap {
+      min-height: 420px;
+      z-index: 10;
+    }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 font-sans antialiased flex flex-col min-h-screen">
+
+  <!-- NAVBAR -->
+  <header class="sticky top-0 z-50 glass-panel border-b border-slate-200/80 shadow-sm">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+      <a href="#" class="flex items-center gap-2">
+        <div class="w-10 h-10 rounded-xl bg-brand-600 text-white flex items-center justify-center font-bold text-xl shadow-md">
+          WN
+        </div>
+        <div>
+          <span class="text-lg font-bold text-slate-900 block leading-none">WISATA NUSANTARA</span>
+          <span class="text-xs text-brand-600 font-semibold tracking-wider uppercase">NTB Portal Specialist</span>
+        </div>
+      </a>
+
+      <nav class="hidden md:flex items-center gap-6 font-medium text-slate-600 text-sm">
+        <a href="#beranda" class="hover:text-brand-600 transition">Beranda</a>
+        <a href="#destinasi" class="hover:text-brand-600 transition">Destinasi NTB</a>
+        <a href="#paket" class="hover:text-brand-600 transition">Paket Wisata</a>
+        <a href="#peta" class="hover:text-brand-600 transition">Peta Interaktif</a>
+        <a href="#admin" class="hover:text-brand-600 transition">Dashboard Admin</a>
+      </nav>
+
+      <div class="flex items-center gap-3">
+        <a href="https://wa.me/6282339892753?text=Halo%20Admin%20WISATA%20NUSANTARA%2C%20saya%20ingin%20konsultasi%20wisata%20NTB" 
+           target="_blank"
+           class="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl text-sm font-semibold shadow-md transition transform hover:-translate-y-0.5">
+          <i class="fa-brands fa-whatsapp text-lg"></i>
+          <span class="hidden sm:inline">CS Resmi 082339892753</span>
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <!-- HERO SECTION -->
+  <section id="beranda" class="relative bg-slate-900 text-white py-20 px-4 sm:px-6 lg:px-8 overflow-hidden">
+    <div class="absolute inset-0 z-0 opacity-40 bg-cover bg-center" style="background-image: url('https://images.unsplash.com/photo-1570789210967-2cac24afeb00?auto=format&fit=crop&w=1600&q=80');"></div>
+    <div class="absolute inset-0 bg-gradient-to-t from-slate-900 via-slate-900/60 to-transparent"></div>
+
+    <div class="relative z-10 max-w-5xl mx-auto text-center space-y-6">
+      <span class="bg-brand-500/20 text-brand-300 border border-brand-400/30 px-4 py-1.5 rounded-full text-xs sm:text-sm font-semibold tracking-wide uppercase">
+        Destinasi Unggulan Nusa Tenggara Barat
+      </span>
+      <h1 class="text-3xl sm:text-5xl font-extrabold tracking-tight leading-tight">
+        Jelajahi Surga Tropis Lombok, Pesona Sumbawa, & Keindahan Kepulauan NTB
+      </h1>
+      <p class="text-slate-300 text-base sm:text-lg max-w-3xl mx-auto">
+        Katalog destinasi lengkap 10 Wilayah Kabupaten/Kota NTB, paket perjalanan custom, reservasi langsung terhubung dengan layanan pelanggan resmi.
+      </p>
+
+      <!-- SEARCH BAR & FILTER REGENCY -->
+      <div class="bg-white p-3 rounded-2xl shadow-xl max-w-3xl mx-auto text-slate-800 flex flex-col sm:flex-row gap-2 mt-8">
+        <div class="flex-1 flex items-center gap-2 px-3 bg-slate-100 rounded-xl">
+          <i class="fa-solid fa-magnifying-glass text-slate-400"></i>
+          <input type="text" id="searchInput" oninput="renderDestinasi()" placeholder="Cari pantai, gili, air terjun, gunung..." class="w-full bg-transparent py-2.5 text-sm focus:outline-none">
+        </div>
+        <select id="regencyFilter" onchange="renderDestinasi()" class="bg-slate-100 px-3 py-2.5 rounded-xl text-sm font-medium focus:outline-none border-r-8 border-transparent">
+          <option value="ALL">Semua 10 Wilayah NTB</option>
+          <option value="Lombok Barat">Lombok Barat</option>
+          <option value="Kota Mataram">Kota Mataram</option>
+          <option value="Lombok Tengah">Lombok Tengah</option>
+          <option value="Lombok Utara">Lombok Utara</option>
+          <option value="Lombok Timur">Lombok Timur</option>
+          <option value="Kabupaten Sumbawa">Kabupaten Sumbawa</option>
+          <option value="Kabupaten Sumbawa Barat">Sumbawa Barat</option>
+          <option value="Kabupaten Dompu">Kabupaten Dompu</option>
+          <option value="Kabupaten Bima">Kabupaten Bima</option>
+          <option value="Kota Bima">Kota Bima</option>
+        </select>
+      </div>
+    </div>
+  </section>
+
+  <!-- KATALOG DESTINASI NTB -->
+  <section id="destinasi" class="py-16 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex-1">
+    <div class="flex flex-col md:flex-row md:items-end justify-between mb-8 gap-4">
+      <div>
+        <h2 class="text-2xl sm:text-3xl font-bold text-slate-900">Katalog Destinasi Wisata</h2>
+        <p class="text-slate-500 text-sm mt-1">Pilih destinasi terbaik untuk liburan impian Anda di Nusa Tenggara Barat</p>
+      </div>
+      <div class="flex items-center gap-2">
+        <span class="text-xs font-semibold text-slate-500 uppercase">Kategori:</span>
+        <select id="categoryFilter" onchange="renderDestinasi()" class="bg-white border border-slate-300 rounded-lg px-3 py-1.5 text-sm font-medium focus:outline-none">
+          <option value="ALL">Semua Kategori</option>
+          <option value="Wisata Pantai">Wisata Pantai</option>
+          <option value="Wisata Pulau">Wisata Pulau & Gili</option>
+          <option value="Wisata Gunung">Wisata Gunung & Trekking</option>
+          <option value="Air Terjun">Air Terjun</option>
+          <option value="Wisata Budaya">Wisata Budaya & Desa</option>
+          <option value="Wisata Religi">Wisata Religi</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- GRID CARDS DESTINASI -->
+    <div id="destinasiGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+      <!-- Injected via JavaScript -->
+    </div>
+  </section>
+
+  <!-- PAKET WISATA NTB -->
+  <section id="paket" class="bg-slate-100 py-16">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="text-center max-w-2xl mx-auto mb-12">
+        <h2 class="text-2xl sm:text-3xl font-bold text-slate-900">Paket Wisata Populer NTB</h2>
+        <p class="text-slate-600 text-sm mt-2">Pilihan paket perjalanan terlengkap dengan fasilitas terbaik dan harga transparan.</p>
+      </div>
+
+      <div id="paketGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <!-- Injected via JavaScript -->
+      </div>
+    </div>
+  </section>
+
+  <!-- PETA INTERAKTIF SECTION -->
+  <section id="peta" class="py-16 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div class="mb-6">
+      <h2 class="text-2xl sm:text-3xl font-bold text-slate-900">Peta Destinasi Wisata NTB</h2>
+      <p class="text-slate-500 text-sm mt-1">Eksplorasi sebaran lokasi destinasi unggulan di Lombok dan Sumbawa secara visual.</p>
+    </div>
+    <div class="bg-white rounded-2xl shadow-lg p-2 border border-slate-200">
+      <div id="leafletMap" class="rounded-xl"></div>
+    </div>
+  </section>
+
+  <!-- DASHBOARD ADMIN & MANAGEMENT -->
+  <section id="admin" class="bg-slate-900 text-white py-16">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-800 pb-6 mb-8 gap-4">
+        <div>
+          <h2 class="text-2xl font-bold">Dashboard Pengelolaan Admin</h2>
+          <p class="text-slate-400 text-sm">Kelola destinasi, paket wisata, dan pemantauan data Google Sheets.</p>
+        </div>
+        <button onclick="openModalTambahDestinasi()" class="bg-brand-600 hover:bg-brand-700 text-white px-4 py-2 rounded-xl text-sm font-semibold transition">
+          <i class="fa-solid fa-plus mr-1"></i> Tambah Destinasi Baru
+        </button>
+      </div>
+
+      <!-- STATISTIK RINGKAS -->
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-8">
+        <div class="bg-slate-800/80 p-5 rounded-2xl border border-slate-700">
+          <span class="text-xs text-slate-400 font-semibold uppercase">Total Destinasi Active</span>
+          <div id="statTotalDestinasi" class="text-3xl font-extrabold text-brand-400 mt-2">0</div>
+        </div>
+        <div class="bg-slate-800/80 p-5 rounded-2xl border border-slate-700">
+          <span class="text-xs text-slate-400 font-semibold uppercase">Total Paket Tersedia</span>
+          <div id="statTotalPaket" class="text-3xl font-extrabold text-emerald-400 mt-2">0</div>
+        </div>
+        <div class="bg-slate-800/80 p-5 rounded-2xl border border-slate-700">
+          <span class="text-xs text-slate-400 font-semibold uppercase">WhatsApp CS Official</span>
+          <div class="text-xl font-bold text-slate-200 mt-2">082339892753</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FOOTER -->
+  <footer class="bg-slate-950 text-slate-400 py-12 border-t border-slate-800">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center text-sm space-y-3">
+      <p class="font-semibold text-slate-300">WISATA NUSANTARA — Portal Destinasi Unggulan Nusa Tenggara Barat</p>
+      <p>© 2026 Wisata Nusantara. Hak Cipta Dilindungi Undang-Undang. Layanan Kontak Resmi WhatsApp: <span class="text-emerald-400 font-medium">082339892753</span></p>
+    </div>
+  </footer>
+
+  <!-- MODAL DETAIL DESTINASI -->
+  <div id="detailModal" class="fixed inset-0 z-50 hidden bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto custom-scrollbar shadow-2xl p-6 relative">
+      <button onclick="closeModal('detailModal')" class="absolute top-4 right-4 w-8 h-8 rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 flex items-center justify-center">
+        <i class="fa-solid fa-xmark"></i>
+      </button>
+      <div id="detailModalContent"></div>
+    </div>
+  </div>
+
+  <!-- JAVASCRIPT APP CORE -->
+  <script>
+    // DATA INITIAL DESTINASI UNGGULAN NTB
+    const initialDestinasi = [
+      { id: 'DEST-01', kabupaten: 'Lombok Barat', nama: 'Senggigi', kategori: 'Wisata Pantai', deskripsi: 'Kawasan pantai ikonik dengan lanskap garis pantai panjang, sunset indah, dan fasilitas lengkap.', lat: -8.5083, lng: 116.0531, harga: 5000, foto: 'https://images.unsplash.com/photo-1570789210967-2cac24afeb00?auto=format&fit=crop&w=600&q=80' },
+      { id: 'DEST-02', kabupaten: 'Kota Mataram', nama: 'Islamic Center Hubbul Wathan', kategori: 'Wisata Religi', deskripsi: 'Pusat keagamaan megah dan ikon arsitektur Islam Nusa Tenggara Barat.', lat: -8.5833, lng: 116.1167, harga: 0, foto: 'https://images.unsplash.com/photo-1591604466107-ec97de577aff?auto=format&fit=crop&w=600&q=80' },
+      { id: 'DEST-03', kabupaten: 'Lombok Tengah', nama: 'Kawasan Mandalika & Pantai Kuta', kategori: 'Wisata Pantai', deskripsi: 'Kawasan ekonomi khusus pariwisata internasional, pantai berpasir merica, dan sirkuit kelas dunia.', lat: -8.8922, lng: 116.2864, harga: 10000, foto: 'https://images.unsplash.com/photo-1512100356356-de1b84283e18?auto=format&fit=crop&w=600&q=80' },
+      { id: 'DEST-04', kabupaten: 'Lombok Utara', nama: 'Gili Trawangan', kategori: 'Wisata Pulau', deskripsi: 'Pulau tropis tanpa kendaraan bermotor, surga snorkeling, diving, dan kehidupan pantai dinamis.', lat: -8.3500, lng: 116.0333, harga: 15000, foto: 'https://images.unsplash.com/photo-1537996194471-e657df975ab4?auto=format&fit=crop&w=600&q=80' },
+      { id: 'DEST-05', kabupaten: 'Lombok Timur', nama: 'Sembalun Rinjani', kategori: 'Wisata Gunung', deskripsi: 'Lembah indah di kaki Rinjani, kebun stroberi, dan pemandangan bukit hijau megah.', lat: -8.3592, lng: 116.5262, harga: 15000, foto: 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=600&q=80' },
+      { id: 'DEST-06', kabupaten: 'Kabupaten Sumbawa', nama: 'Pulau Moyo & Mata Jitu', kategori: 'Wisata Pulau', deskripsi: 'Pulau eksotis kelas dunia dengan air terjun Mata Jitu dan terumbu karang alami.', lat: -8.2500, lng: 117.5333, harga: 20000, foto: 'https://images.unsplash.com/photo-1544551763-46a013bb70d5?auto=format&fit=crop&w=600&q=80' },
+      { id: 'DEST-07', kabupaten: 'Kabupaten Sumbawa Barat', nama: 'Pulau Kenawa', kategori: 'Wisata Pulau', deskripsi: 'Pulau savana tak berpenghuni dengan pemandangan 360 derajat bukit unik dan laut jernih.', lat: -8.4833, lng: 116.8333, harga: 10000, foto: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=600&q=80' },
+      { id: 'DEST-08', kabupaten: 'Kabupaten Dompu', nama: 'Gunung Tambora & Doro Ncanga', kategori: 'Wisata Gunung', deskripsi: 'Gunung bersejarah dunia dengan kaldera terbesar dan padang savana Doro Ncanga.', lat: -8.2500, lng: 117.9833, harga: 20000, foto: 'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&w=600&q=80' }
+    ];
+
+    const initialPaket = [
+      { id: 'PKT-01', nama: 'Lombok Selatan One Day Trip', durasi: '1 Hari', harga: 350000, fasilitas: 'Transport AC, Pemandu, Tiket Masuk, Air Mineral' },
+      { id: 'PKT-02', nama: 'Island Hopping Gili Trawangan, Meno & Air', durasi: '1 Hari', harga: 450000, fasilitas: 'Public Boat / Speedboat, Alat Snorkeling, Guide' },
+      { id: 'PKT-03', nama: 'Sembalun & Panorama Rinjani Tour', durasi: '2 Hari 1 Malam', harga: 850000, fasilitas: 'Hotel, Transport, Makan 4x, Tiket Wisata' },
+      { id: 'PKT-04', nama: 'Sumbawa & Eksplorasi Pulau Moyo', durasi: '3 Hari 2 Malam', harga: 1750000, fasilitas: 'Kapal Penyeberangan, Penginapan, Pemandu Lokal' }
+    ];
+
+    let destinasiData = [...initialDestinasi];
+    let paketData = [...initialPaket];
+    let mapInstance = null;
+
+    window.addEventListener('DOMContentLoaded', () => {
+      initApp();
+      initLeafletMap();
+    });
+
+    function initApp() {
+      // Cek apakah server Google Apps Script mengirim data
+      if (typeof google !== 'undefined' && google.script && google.script.run) {
+        google.script.run.withSuccessHandler((res) => {
+          if (res && res.success && res.destinasi && res.destinasi.length > 0) {
+            destinasiData = res.destinasi;
+          }
+          if (res && res.paket && res.paket.length > 0) {
+            paketData = res.paket;
+          }
+          renderDestinasi();
+          renderPaket();
+          updateStats();
+        }).getInitialData();
+      } else {
+        renderDestinasi();
+        renderPaket();
+        updateStats();
+      }
+    }
+
+    function renderDestinasi() {
+      const search = document.getElementById('searchInput').value.toLowerCase();
+      const regency = document.getElementById('regencyFilter').value;
+      const category = document.getElementById('categoryFilter').value;
+
+      const filtered = destinasiData.filter(item => {
+        const matchSearch = item.nama.toLowerCase().includes(search) || item.deskripsi.toLowerCase().includes(search);
+        const matchRegency = regency === 'ALL' || item.kabupaten === regency;
+        const matchCategory = category === 'ALL' || item.kategori === category;
+        return matchSearch && matchRegency && matchCategory;
+      });
+
+      const container = document.getElementById('destinasiGrid');
+      container.innerHTML = '';
+
+      if (filtered.length === 0) {
+        container.innerHTML = `<div class="col-span-full text-center py-12 text-slate-400">Destinasi tidak ditemukan.</div>`;
+        return;
+      }
+
+      filtered.forEach(item => {
+        const waMsg = encodeURIComponent(`Halo Admin WISATA NUSANTARA, saya berminat dengan destinasi: ${item.nama} (${item.kabupaten}). Mohon info paket dan harganya.`);
+        const card = document.createElement('div');
+        card.className = 'bg-white rounded-2xl overflow-hidden border border-slate-200/80 shadow-sm hover:shadow-md transition flex flex-col';
+        card.innerHTML = `
+          <div class="relative h-48 bg-slate-200 overflow-hidden">
+            <img src="${item.foto}" alt="${item.nama}" class="w-full h-full object-cover transform hover:scale-105 transition duration-500">
+            <span class="absolute top-3 left-3 bg-slate-900/70 text-white text-xs px-2.5 py-1 rounded-full backdrop-blur-md">
+              ${item.kabupaten}
+            </span>
+          </div>
+          <div class="p-5 flex-1 flex flex-col justify-between space-y-4">
+            <div>
+              <span class="text-xs font-semibold text-brand-600 tracking-wide uppercase block mb-1">${item.kategori}</span>
+              <h3 class="text-lg font-bold text-slate-900 line-clamp-1">${item.nama}</h3>
+              <p class="text-slate-600 text-xs mt-1 line-clamp-2">${item.deskripsi}</p>
+            </div>
+            <div class="pt-3 border-t border-slate-100 flex items-center justify-between">
+              <div>
+                <span class="text-[10px] text-slate-400 block">Tiket Masuk:</span>
+                <span class="text-sm font-bold text-slate-900">${item.harga > 0 ? 'Rp ' + Number(item.harga).toLocaleString('id-ID') : 'Gratis / Lokal'}</span>
+              </div>
+              <div class="flex gap-2">
+                <button onclick="showDetailDestinasi('${item.id}')" class="px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold">
+                  Detail
+                </button>
+                <a href="https://wa.me/6282339892753?text=${waMsg}" target="_blank" class="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold">
+                  Tanya WA
+                </a>
+              </div>
+            </div>
+          </div>
+        `;
+        container.appendChild(card);
+      });
+    }
+
+    function renderPaket() {
+      const container = document.getElementById('paketGrid');
+      container.innerHTML = '';
+
+      paketData.forEach(pkt => {
+        const waMsg = encodeURIComponent(`Halo Admin WISATA NUSANTARA, saya mau pesan paket: ${pkt.nama}. Tanggal perjalanan: [Isi Tanggal]. Jumlah peserta: [Isi Jumlah].`);
+        const card = document.createElement('div');
+        card.className = 'bg-white rounded-2xl p-6 border border-slate-200 shadow-sm flex flex-col justify-between space-y-4';
+        card.innerHTML = `
+          <div>
+            <span class="bg-brand-50 text-brand-700 text-xs font-bold px-2.5 py-1 rounded-md inline-block mb-3">${pkt.durasi}</span>
+            <h3 class="text-xl font-bold text-slate-900">${pkt.nama}</h3>
+            <p class="text-xs text-slate-500 mt-2"><i class="fa-solid fa-circle-check text-emerald-500 mr-1"></i> Fasilitas: ${pkt.fasilitas}</p>
+          </div>
+          <div class="pt-4 border-t border-slate-100 flex items-center justify-between">
+            <div>
+              <span class="text-[10px] text-slate-400 block">Mulai Dari:</span>
+              <span class="text-lg font-extrabold text-brand-600">Rp ${Number(pkt.harga).toLocaleString('id-ID')}</span>
+            </div>
+            <a href="https://wa.me/6282339892753?text=${waMsg}" target="_blank" class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl text-xs font-bold shadow transition">
+              Pesan Sekarang
+            </a>
+          </div>
+        `;
+        container.appendChild(card);
+      });
+    }
+
+    function initLeafletMap() {
+      if (mapInstance) return;
+      mapInstance = L.map('leafletMap').setView([-8.6500, 116.3249], 9);
+
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; OpenStreetMap contributors'
+      }).addTo(mapInstance);
+
+      destinasiData.forEach(d => {
+        if (d.lat && d.lng) {
+          L.marker([d.lat, d.lng]).addTo(mapInstance)
+            .bindPopup(`<b>${d.nama}</b><br>${d.kabupaten}<br><span class="text-xs">${d.kategori}</span>`);
+        }
+      });
+    }
+
+    function showDetailDestinasi(id) {
+      const item = destinasiData.find(d => d.id === id);
+      if (!item) return;
+
+      const waMsg = encodeURIComponent(`Halo Admin WISATA NUSANTARA, saya ingin tanya info detail destinasi: ${item.nama}`);
+      const content = document.getElementById('detailModalContent');
+      content.innerHTML = `
+        <img src="${item.foto}" class="w-full h-56 object-cover rounded-xl mb-4">
+        <span class="text-xs font-semibold text-brand-600 uppercase">${item.kabupaten} — ${item.kategori}</span>
+        <h3 class="text-2xl font-bold text-slate-900 mt-1">${item.nama}</h3>
+        <p class="text-slate-600 text-sm mt-3 leading-relaxed">${item.deskripsi}</p>
+        
+        <div class="bg-slate-50 p-4 rounded-xl mt-4 flex justify-between items-center text-sm">
+          <div>
+            <span class="text-xs text-slate-400 block">Harga Tiket Masuk</span>
+            <span class="font-bold text-slate-800">${item.harga > 0 ? 'Rp ' + Number(item.harga).toLocaleString('id-ID') : 'Gratis / Area Terbuka'}</span>
+          </div>
+          <a href="https://wa.me/6282339892753?text=${waMsg}" target="_blank" class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl font-bold text-xs">
+            Hubungi CS Via WA
+          </a>
+        </div>
+      `;
+      document.getElementById('detailModal').classList.remove('hidden');
+    }
+
+    function closeModal(id) {
+      document.getElementById(id).classList.add('hidden');
+    }
+
+    function updateStats() {
+      document.getElementById('statTotalDestinasi').innerText = destinasiData.length;
+      document.getElementById('statTotalPaket').innerText = paketData.length;
+    }
+
+    function openModalTambahDestinasi() {
+      alert('Gunakan Sheet Google Anda untuk menambah baris data baru pada Sheet "Destinasi", atau gunakan form integrasi kustom.');
+    }
+  </script>
+</body>
+</html>

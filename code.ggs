@@ -1,0 +1,252 @@
+/**
+ * BACKEND WISATA NUSANTARA - NTB MODULE
+ * Google Apps Script Web App Engine
+ * Nomor WhatsApp Resmi: 082339892753
+ */
+
+/**
+ * RENDER UTAMA APLIKASI WEB
+ */
+function doGet(e) {
+  try {
+    return HtmlService.createTemplateFromFile('Index')
+      .evaluate()
+      .setTitle('WISATA NUSANTARA - Destinasi Unggulan NTB')
+      .addMetaTag('viewport', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no')
+      .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+  } catch (err) {
+    return HtmlService.createHtmlOutput('<h3>Terjadi kesalahan saat memuat aplikasi: ' + err.toString() + '</h3>');
+  }
+}
+
+/**
+ * SETUP DATABASE UTAMA (Jalankan sekali)
+ */
+function setupDatabase() {
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sheets = [
+      { name: 'Destinasi', headers: ['ID', 'Provinsi', 'KabupatenKota', 'NamaDestinasi', 'Kategori', 'Deskripsi', 'Lat', 'Lng', 'HargaTiket', 'JamOperasional', 'Aksesibilitas', 'Status', 'FotoUrl', 'UpdatedAt'] },
+      { name: 'PaketWisata', headers: ['ID', 'NamaPaket', 'Kategori', 'Durasi', 'HargaMulai', 'DestinasiTerkait', 'Fasilitas', 'ItineraryJSON', 'Status', 'UpdatedAt'] },
+      { name: 'Jadwal', headers: ['ID', 'IDPaket', 'TanggalBerangkat', 'Kuota', 'Tersisa', 'Status'] },
+      { name: 'Booking', headers: ['ID', 'TanggalBooking', 'NamaPemesan', 'NoWhatsApp', 'Email', 'TipeLayanan', 'IDItem', 'NamaItem', 'TanggalPerjalanan', 'JumlahPeserta', 'TotalHarga', 'StatusPayment', 'Catatan'] },
+      { name: 'Peserta', headers: ['ID', 'IDBooking', 'NamaLengkap', 'NoKTP', 'NoHP', 'KebutuhanKhusus'] },
+      { name: 'Promo', headers: ['ID', 'KodePromo', 'DiskonPersen', 'MaxDiskon', 'BerlakuHingga', 'Status'] },
+      { name: 'Galeri', headers: ['ID', 'IDDestinasi', 'Judul', 'Type', 'Url', 'Keterangan'] },
+      { name: 'Artikel', headers: ['ID', 'Judul', 'Slug', 'Penulis', 'Konten', 'Tags', 'Status', 'CreatedAt'] },
+      { name: 'KabupatenKota', headers: ['ID', 'NamaWilayah', 'Provinsi', 'JumlahDestinasi', 'FotoUtama'] },
+      { name: 'KategoriWisata', headers: ['ID', 'NamaKategori', 'IconClass', 'FotoCover'] }
+    ];
+
+    sheets.forEach(sh => {
+      let sheet = ss.getSheetByName(sh.name);
+      if (!sheet) {
+        sheet = ss.insertSheet(sh.name);
+        sheet.appendRow(sh.headers);
+        sheet.getRange(1, 1, 1, sh.headers.length)
+             .setFontWeight('bold')
+             .setBackground('#0D9488')
+             .setFontColor('#FFFFFF');
+      }
+    });
+    return "Database Wisata NTB Berhasil Diinisialisasi!";
+  } catch (err) {
+    return "Gagal inisialisasi database: " + err.toString();
+  }
+}
+
+/**
+ * RETRIEVE ALL INITIAL DATA (SAFE & ERROR-FREE)
+ */
+function getInitialData() {
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    if (!ss) throw new Error("Spreadsheet aktif tidak ditemukan. Pastikan script ini terikat ke Google Sheets.");
+
+    const destinasiSheet = ss.getSheetByName('Destinasi');
+    const paketSheet = ss.getSheetByName('PaketWisata');
+    const bookingSheet = ss.getSheetByName('Booking');
+
+    return {
+      success: true,
+      destinasi: getSheetDataAsDataObjects(destinasiSheet),
+      paket: getSheetDataAsDataObjects(paketSheet),
+      bookingStats: getBookingSummaryStats(bookingSheet)
+    };
+  } catch (err) {
+    return { 
+      success: false, 
+      message: err.toString(),
+      destinasi: [],
+      paket: [],
+      bookingStats: { totalBooking: 0, totalPeserta: 0, totalPendapatan: 0 }
+    };
+  }
+}
+
+/**
+ * HELPER: CONVERT SHEET TO JSON OBJECT ARRAY (SAFE FROM NULL/ERRORS)
+ */
+function getSheetDataAsDataObjects(sheet) {
+  if (!sheet) return [];
+  
+  const lastRow = sheet.getLastRow();
+  const lastCol = sheet.getLastColumn();
+  
+  if (lastRow <= 1 || lastCol === 0) return [];
+
+  const data = sheet.getRange(1, 1, lastRow, lastCol).getValues();
+  const headers = data[0];
+  const rows = data.slice(1);
+
+  return rows.map(row => {
+    let obj = {};
+    headers.forEach((h, idx) => {
+      let val = row[idx];
+      // Format tanggal jika kolom berupa Date Object
+      if (val instanceof Date) {
+        val = Utilities.formatDate(val, Session.getScriptTimeZone(), "yyyy-MM-dd HH:mm:ss");
+      }
+      obj[h] = (val !== null && val !== undefined) ? val : '';
+    });
+    return obj;
+  });
+}
+
+/**
+ * HELPER: CALCULATE BOOKING STATS SAFELY
+ */
+function getBookingSummaryStats(sheet) {
+  if (!sheet) return { totalBooking: 0, totalPeserta: 0, totalPendapatan: 0 };
+  
+  const lastRow = sheet.getLastRow();
+  if (lastRow <= 1) return { totalBooking: 0, totalPeserta: 0, totalPendapatan: 0 };
+
+  const data = sheet.getRange(2, 1, lastRow - 1, 13).getValues();
+  let totalPeserta = 0;
+  let totalPendapatan = 0;
+
+  data.forEach(r => {
+    // Indeks 9: JumlahPeserta, Indeks 10: TotalHarga
+    const peserta = Number(r[9]);
+    const harga = Number(r[10]);
+    
+    if (!isNaN(peserta)) totalPeserta += peserta;
+    if (!isNaN(harga)) totalPendapatan += harga;
+  });
+
+  return {
+    totalBooking: data.length,
+    totalPeserta: totalPeserta,
+    totalPendapatan: totalPendapatan
+  };
+}
+
+/**
+ * API: SIMPAN BOOKING BARU
+ */
+function saveNewBooking(bookingData) {
+  try {
+    if (!bookingData) throw new Error("Data booking kosong.");
+
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    let sheet = ss.getSheetByName('Booking');
+    if (!sheet) {
+      setupDatabase();
+      sheet = ss.getSheetByName('Booking');
+    }
+
+    const bookingId = 'BK-NTB-' + String(new Date().getTime()).slice(-6);
+    const now = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM-dd");
+
+    const row = [
+      bookingId,
+      now,
+      bookingData.namaPemesan || 'Tanpa Nama',
+      bookingData.noWhatsApp || '082339892753',
+      bookingData.email || '-',
+      bookingData.tipeLayanan || 'Paket Wisata NTB',
+      bookingData.idItem || 'CUSTOM',
+      bookingData.namaItem || 'Paket Custom NTB',
+      bookingData.tanggalPerjalanan || now,
+      Number(bookingData.jumlahPeserta) || 1,
+      Number(bookingData.totalHarga) || 0,
+      'Pending Verification',
+      bookingData.catatan || '-'
+    ];
+
+    sheet.appendRow(row);
+    return { success: true, bookingId: bookingId };
+  } catch (err) {
+    return { success: false, message: err.toString() };
+  }
+}
+
+/**
+ * API: SIMPAN ATAU UPDATE DATA DESTINASI
+ */
+function saveDestinasiAdmin(data) {
+  try {
+    if (!data) throw new Error("Data destinasi kosong.");
+
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    let sheet = ss.getSheetByName('Destinasi');
+    if (!sheet) {
+      setupDatabase();
+      sheet = ss.getSheetByName('Destinasi');
+    }
+
+    const id = data.id || 'DEST-' + String(new Date().getTime()).slice(-5);
+    const now = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM-dd HH:mm:ss");
+
+    if (data.isEdit && data.id) {
+      const lastRow = sheet.getLastRow();
+      if (lastRow > 1) {
+        const ids = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
+        for (let i = 0; i < ids.length; i++) {
+          if (ids[i][0] === data.id) {
+            sheet.getRange(i + 2, 1, 1, 14).setValues([[
+              id,
+              'Nusa Tenggara Barat',
+              data.kabupaten || '-',
+              data.nama || '-',
+              data.kategori || 'Wisata Alam',
+              data.deskripsi || '-',
+              data.lat || 0,
+              data.lng || 0,
+              Number(data.harga) || 0,
+              data.jam || '24 Jam',
+              data.akses || 'Mudah',
+              data.status || 'Aktif',
+              data.foto || '',
+              now
+            ]]);
+            return { success: true, message: 'Data destinasi berhasil diperbarui!' };
+          }
+        }
+      }
+    }
+
+    // Jika data baru
+    sheet.appendRow([
+      id,
+      'Nusa Tenggara Barat',
+      data.kabupaten || '-',
+      data.nama || '-',
+      data.kategori || 'Wisata Alam',
+      data.deskripsi || '-',
+      data.lat || 0,
+      data.lng || 0,
+      Number(data.harga) || 0,
+      data.jam || '24 Jam',
+      data.akses || 'Mudah',
+      'Aktif',
+      data.foto || '',
+      now
+    ]);
+
+    return { success: true, message: 'Destinasi baru berhasil ditambahkan!' };
+  } catch (err) {
+    return { success: false, message: err.toString() };
+  }
+}
